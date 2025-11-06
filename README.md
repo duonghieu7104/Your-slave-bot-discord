@@ -45,12 +45,14 @@ A powerful Discord bot that helps you manage tasks, notes, and leverages Google'
 
 ### Demo
 
-> Add your screenshots and video links here
 
 **Screenshots:**
-- [Add screenshot of bot commands]
-- [Add screenshot of task management]
-- [Add screenshot of AI responses]
+- <img width="1276" height="588" alt="image" src="https://github.com/user-attachments/assets/8f7c0f42-2a29-4654-9ed1-91fc972ed3c0" />
+
+- <img width="1406" height="380" alt="image" src="https://github.com/user-attachments/assets/3e3335cc-c0b6-4154-a222-20642389a43a" />
+
+- <img width="621" height="757" alt="image" src="https://github.com/user-attachments/assets/3d40d6ed-5b37-446a-803e-f75976a998a8" />
+
 
 **Video Demo:**
 - [Add video link here]
