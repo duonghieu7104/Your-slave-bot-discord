@@ -1,281 +1,474 @@
-# Discord Task & Note Manager Bot
+# Discord Task & Note Manager Bot with Gemini AI
 
-AI-powered Discord bot for task management, note-taking, and intelligent conversation analysis using Google's Gemini API.
+A powerful Discord bot that helps you manage tasks, notes, and leverages Google's Gemini AI to provide intelligent assistance based on your conversation history and project plans.
 
-## Features
+## Table of Contents
 
-- 🤖 **AI-Powered Responses** - Ask questions with conversation context using Gemini
-- ✅ **Task Management** - Create, track, and manage tasks with status and priorities
-- 📝 **Note Taking** - Store and search notes with tags
-- 💬 **Message Monitoring** - Automatically collects messages from selected channels
-- 📊 **Smart Summaries** - Summarize conversations and analyze tasks/notes
-- 💾 **Auto-Save** - Persistent storage with automatic backups
+- [0. Introduction](#0-introduction)
+  - [Features](#features)
+  - [Demo](#demo)
+  - [Prerequisites](#prerequisites)
+  - [Project Structure](#project-structure)
+- [1. Run Locally](#1-run-locally)
+  - [Installation](#installation)
+  - [Configuration](#configuration)
+  - [Running the Bot](#running-the-bot)
+- [2. Run with Docker](#2-run-with-docker)
+  - [Using Docker](#using-docker)
+  - [Using Docker Compose](#using-docker-compose)
+- [3. Deploy to Railway](#3-deploy-to-railway)
+  - [Setup](#setup)
+  - [Environment Variables](#environment-variables)
+  - [Deployment](#deployment)
+- [Commands Reference](#commands-reference)
+- [Troubleshooting](#troubleshooting)
 
-## Quick Start
+---
 
-### 1. Get Your API Keys
+## 0. Introduction
 
-#### Discord Bot Token
-1. Go to https://discord.com/developers/applications
-2. Click "New Application" → Name it
-3. Go to "Bot" section → Click "Add Bot"
-4. **IMPORTANT**: Enable these under "Privileged Gateway Intents":
-   - ✅ **MESSAGE CONTENT INTENT** (required!)
-   - ✅ PRESENCE INTENT
-   - ✅ SERVER MEMBERS INTENT
-5. Click "Reset Token" → Copy the token
+### Features
 
-#### Gemini API Key
-1. Go to https://makersuite.google.com/app/apikey
-2. Click "Create API Key"
-3. Copy your API key
+- **Task Management**: Create, track, and manage tasks with priorities and due dates
+- **Note Taking**: Store and search through notes with tags
+- **AI-Powered Assistance**: 
+  - Ask questions with context from your notes and plans
+  - Chat directly with Gemini AI without context
+  - Summarize conversations
+  - Analyze tasks and notes
+- **Smart Channel System**:
+  - Context Channels: Messages are stored and used as AI context (notes, plans, documentation)
+  - Command Channels: Bot responds to commands only (messages not stored)
+- **Message Buffer**: Automatically fetches and stores messages from context channels
+- **Data Persistence**: Saves tasks and notes to JSON file
 
-### 2. Install Dependencies
+### Demo
+
+> Add your screenshots and video links here
+
+**Screenshots:**
+- [Add screenshot of bot commands]
+- [Add screenshot of task management]
+- [Add screenshot of AI responses]
+
+**Video Demo:**
+- [Add video link here]
+
+### Prerequisites
+
+- Python 3.8 or higher
+- Discord Bot Token - [Create one here](https://discord.com/developers/applications)
+- Google Gemini API Key - [Get one here](https://makersuite.google.com/app/apikey)
+- Docker (optional, for containerized deployment)
+- Railway account (optional, for cloud deployment)
+
+### Project Structure
+
+```
+Your-slave/
+├── bot.py                 # Main bot implementation
+├── config.py             # Configuration management
+├── gemini_service.py     # Gemini AI integration
+├── message_buffer.py     # Message buffering system
+├── task_note_manager.py  # Task and note management
+├── persistence.py        # Data persistence
+├── requirements.txt      # Python dependencies
+├── .env                  # Environment variables (create from .env.example)
+├── .env.example         # Environment variables template
+├── Dockerfile           # Docker configuration
+├── docker-compose.yml   # Docker Compose configuration
+├── Procfile            # Railway deployment configuration
+├── railway.json        # Railway configuration
+├── README.md           # This file
+└── data/               # Data storage directory
+    └── bot_data.json   # Persisted tasks and notes
+```
+
+---
+
+## 1. Run Locally
+
+### Installation
+
+**Step 1: Clone the Repository**
+
+```bash
+git clone <your-repo-url>
+cd Your-slave
+```
+
+**Step 2: Install Dependencies**
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Configure Environment
+### Configuration
 
-Create a `.env` file for **LOCAL DEVELOPMENT**:
+**Step 1: Create Environment File**
 
 ```bash
-# Discord Bot Configuration
-DISCORD_TOKEN=your_discord_token_here
-COMMAND_PREFIX="!g "
+cp .env.example .env
+```
 
-# Gemini API Configuration
+**Step 2: Edit `.env` File**
+
+Open `.env` and configure the following:
+
+```env
+# Discord Bot Token
+DISCORD_TOKEN=your_discord_token_here
+
+# Gemini API Key
 GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-2.5-flash
 
 # Bot Configuration
+COMMAND_PREFIX="!g "
+GEMINI_MODEL=gemini-2.5-flash
 MESSAGE_BUFFER_SIZE=500
-MONITORED_CHANNELS=channel_id_1,channel_id_2,channel_id_3
+
+# Context Channels: Messages from these channels are read and used as context for Gemini AI
+# These should be your notes, plans, documentation channels
+CONTEXT_CHANNELS=channel_id_1,channel_id_2,channel_id_3
+
+# Command Channels: Bot responds to commands here, but messages are NOT used as context
+# These are your bot interaction channels
+COMMAND_CHANNELS=channel_id_4,channel_id_5,channel_id_6
+
 ENABLE_PERSISTENCE=true
 PERSISTENCE_FILE=data/bot_data.json
 ```
 
-**⚠️ IMPORTANT:**
-- For **local development**: Use `COMMAND_PREFIX="!g "` (with quotes)
-- For **Railway deployment**: Use `COMMAND_PREFIX=!g ` (without quotes)
-- Make sure there's a **space after !g** in both cases
+**Important Notes:**
+- For local development, use `COMMAND_PREFIX="!g "` (WITH quotes and space)
+- Get channel IDs by enabling Developer Mode in Discord (User Settings → Advanced → Developer Mode), then right-click channel → Copy ID
 
-**How to get Channel IDs:**
-1. Enable Developer Mode in Discord (Settings → Advanced → Developer Mode)
-2. Right-click on a channel → Copy Channel ID
-3. Add multiple channel IDs separated by commas
+### Running the Bot
 
-### 4. Invite Bot to Your Server
-
-1. Go to https://discord.com/developers/applications
-2. Select your application → "OAuth2" → "URL Generator"
-3. Select scopes: ✅ `bot`
-4. Select permissions:
-   - ✅ Read Messages/View Channels
-   - ✅ Send Messages
-   - ✅ Read Message History
-   - ✅ Embed Links
-   - ✅ Attach Files
-5. Copy the generated URL and open in browser
-6. Select your server and authorize
-
-### 5. Run the Bot
+**Start the bot:**
 
 ```bash
 python bot.py
 ```
 
-You should see:
+**Expected output:**
+
 ```
-✅ Bot is ready! Logged in as YourBot#1234
-✅ Monitoring X channels
+================================================================================
+Bot is ready! Logged in as YourBot#1234
+================================================================================
+CONTEXT CHANNELS (notes/plans - used for AI): 3
+   - 1234567890 (#project-notes)
+   - 9876543210 (#planning)
+   - 5555555555 (#documentation)
+COMMAND CHANNELS (bot commands only): 2
+   - 1111111111 (#bot-commands)
+   - 2222222222 (#general)
+Command prefix: !g 
+Buffer size: 500
+================================================================================
+Fetching old messages from context channels...
+Total messages fetched: 150
+================================================================================
 ```
 
-## Commands
+**Test the bot in Discord:**
 
-All commands start with `!g ` (note the space after !g)
-
-### General
 ```
-!g commands          # Show all commands
-!g stats             # Show bot statistics
-!g save              # Manually save data
+!g commands
 ```
 
-### Tasks
+---
+
+## 2. Run with Docker
+
+### Using Docker
+
+**Step 1: Build the Docker Image**
+
+```bash
+docker build -t discord-bot .
 ```
-!g task add <title> | <description>    # Create a task
-!g task list [status]                  # List tasks
+
+**Step 2: Run the Container**
+
+```bash
+docker run -d --name discord-bot \
+  --env-file .env \
+  -v $(pwd)/data:/app/data \
+  discord-bot
+```
+
+**Step 3: View Logs**
+
+```bash
+docker logs -f discord-bot
+```
+
+**Step 4: Stop the Container**
+
+```bash
+docker stop discord-bot
+docker rm discord-bot
+```
+
+### Using Docker Compose
+
+**Step 1: Start the Bot**
+
+```bash
+docker-compose up -d
+```
+
+**Step 2: View Logs**
+
+```bash
+docker-compose logs -f
+```
+
+**Step 3: Stop the Bot**
+
+```bash
+docker-compose down
+```
+
+**Step 4: Restart the Bot**
+
+```bash
+docker-compose restart
+```
+
+---
+
+## 3. Deploy to Railway
+
+### Setup
+
+**Step 1: Create Railway Account**
+
+Go to [railway.app](https://railway.app) and sign up with GitHub
+
+**Step 2: Create New Project**
+
+1. Click "New Project"
+2. Select "Deploy from GitHub repo"
+3. Connect your GitHub account
+4. Select your repository
+
+### Environment Variables
+
+**Step 1: Go to Variables Tab**
+
+In your Railway project, click on the "Variables" tab
+
+**Step 2: Add Environment Variables**
+
+Click "Raw Editor" and paste the following:
+
+```
+DISCORD_TOKEN=your_discord_token_here
+GEMINI_API_KEY=your_gemini_api_key_here
+COMMAND_PREFIX=!g 
+GEMINI_MODEL=gemini-2.5-flash
+MESSAGE_BUFFER_SIZE=500
+CONTEXT_CHANNELS=channel_id_1,channel_id_2,channel_id_3
+COMMAND_CHANNELS=channel_id_4,channel_id_5,channel_id_6
+ENABLE_PERSISTENCE=true
+PERSISTENCE_FILE=data/bot_data.json
+```
+
+**CRITICAL DIFFERENCES from Local:**
+
+| Variable | Local (.env file) | Railway (Variables) |
+|----------|-------------------|---------------------|
+| COMMAND_PREFIX | `COMMAND_PREFIX="!g "` (WITH quotes) | `COMMAND_PREFIX=!g ` (NO quotes) |
+| Other variables | Same syntax | Same syntax |
+
+**Why?**
+- Local: `python-dotenv` strips trailing whitespace unless quoted
+- Railway: Environment variables are literal, quotes become part of the value
+
+### Deployment
+
+**Step 1: Deploy**
+
+Railway will automatically deploy after you add environment variables
+
+**Step 2: Monitor Deployment**
+
+Click on "Deployments" tab to see build logs
+
+**Step 3: Verify Bot is Running**
+
+Check the logs for:
+
+```
+================================================================================
+Bot is ready! Logged in as YourBot#1234
+================================================================================
+CONTEXT CHANNELS (notes/plans - used for AI): 3
+COMMAND CHANNELS (bot commands only): 2
+Command prefix: !g
+================================================================================
+```
+
+**Step 4: Test in Discord**
+
+```
+!g commands
+```
+
+---
+
+## Commands Reference
+
+### Task Commands
+
+```
+!g task add <title> | <description>    # Add a new task
+!g task list [status]                  # List tasks (filter by status)
 !g task done <id>                      # Mark task as done
 !g task delete <id>                    # Delete a task
 ```
 
-### Notes
-```
-!g note add <title> | <content>    # Create a note
-!g note list                       # List all notes
-!g note search <query>             # Search notes
-!g note delete <id>                # Delete a note
-```
+### Note Commands
 
-### AI
 ```
-!g ask <question>           # Ask AI with conversation context
-!g summarize [limit]        # Summarize recent messages
-!g analyze tasks            # Get AI insights on your tasks
-!g analyze notes            # Get AI insights on your notes
+!g note add <title> | <content>        # Add a new note
+!g note list                           # List all notes
+!g note search <query>                 # Search notes
+!g note delete <id>                    # Delete a note
 ```
 
-## Deploy for 24/7 Operation
+### AI Commands
 
-### 🔑 Environment Variables: Local vs Railway
+```
+!g ask <question>                      # Ask with context from notes/plans
+!g chat <prompt>                       # Chat with Gemini (no context)
+!g summarize [limit]                   # Summarize recent messages
+!g analyze tasks                       # Analyze your tasks
+!g analyze notes                       # Analyze your notes
+```
 
-**The syntax is DIFFERENT for local and Railway!**
+### Utility Commands
 
-| Variable | Local (.env file) | Railway (Variables) |
-|----------|-------------------|---------------------|
-| COMMAND_PREFIX | `COMMAND_PREFIX="!g "` (with quotes) | `COMMAND_PREFIX=!g ` (no quotes) |
-| Other variables | Same | Same |
-
-**Why?** Local uses `python-dotenv` which strips quotes. Railway passes values directly, so quotes become part of the value.
+```
+!g stats                               # Show bot statistics
+!g buffer [limit]                      # Show buffered messages
+!g save                                # Manually save data
+!g monitor <channel_id>                # Add channel to monitoring
+```
 
 ---
-
-### Option 1: Railway (Recommended - Free Tier)
-
-1. **Fork**
-
-2. **Deploy to Railway**
-   - Go to https://railway.app
-   - Sign up/Login with GitHub
-   - Click "New Project" → "Deploy from GitHub repo"
-   - Select your repository
-
-3. **Add Environment Variables in Railway**
-
-   **⚠️ IMPORTANT:** Railway syntax is different from local .env file!
-
-   Click "Variables" tab → "Raw Editor" and paste:
-
-   ```
-   DISCORD_TOKEN=your_discord_token_here
-   GEMINI_API_KEY=your_gemini_api_key_here
-   COMMAND_PREFIX=!g
-   GEMINI_MODEL=gemini-2.5-flash
-   MESSAGE_BUFFER_SIZE=500
-   MONITORED_CHANNELS=channel_id_1,channel_id_2,channel_id_3
-   ENABLE_PERSISTENCE=true
-   PERSISTENCE_FILE=data/bot_data.json
-   ```
-
-   **⚠️ CRITICAL:**
-   - Use `COMMAND_PREFIX=!g ` (NO quotes, but WITH space after !g)
-   - If you use quotes, the bot won't recognize commands!
-
-4. **Deploy**
-   - Railway will automatically deploy
-   - Check logs - you should see: `Command prefix is: '!g '`
-   - If you see `Command prefix is: '"!g "'` → Remove the quotes from COMMAND_PREFIX
-
-### Option 2: Docker
-
-```bash
-# Build and run
-docker build -t discord-bot .
-docker run -d --name discord-bot --env-file .env discord-bot
-
-# Or use Docker Compose
-docker-compose up -d
-```
-
-### Option 3: VPS/Server with systemd
-
-Create `/etc/systemd/system/discord-bot.service`:
-
-```ini
-[Unit]
-Description=Discord Task Bot
-After=network.target
-
-[Service]
-Type=simple
-User=your_user
-WorkingDirectory=/path/to/bot
-Environment="PATH=/path/to/venv/bin"
-ExecStart=/path/to/venv/bin/python bot.py
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start:
-```bash
-sudo systemctl enable discord-bot
-sudo systemctl start discord-bot
-sudo systemctl status discord-bot
-```
 
 ## Troubleshooting
 
-**Bot doesn't respond to commands:**
+### Bot doesn't respond to commands
 
-1. **Check the logs for command prefix:**
-   - ✅ **Correct:** `Command prefix is: '!g '` (with space, no extra quotes)
-   - ❌ **Wrong:** `Command prefix is: '"!g "'` (has extra quotes)
+**Problem:** Command prefix mismatch
 
-2. **If running locally:**
-   - ✅ Use `COMMAND_PREFIX="!g "` in .env file (with quotes)
+**Solution:**
 
-3. **If running on Railway:**
-   - ✅ Use `COMMAND_PREFIX=!g ` in Railway Variables (no quotes, but with space)
-   - ❌ Don't use `COMMAND_PREFIX="!g "` (will add extra quotes)
+Check your environment configuration:
 
-4. **Other checks:**
-   - ✅ Enable MESSAGE CONTENT INTENT in Discord Developer Portal
-   - ✅ Check you're typing in a monitored channel
-   - ✅ Verify bot has message permissions
-
-**Bot can't see messages:**
-- ✅ Enable MESSAGE CONTENT INTENT
-- ✅ Check channel IDs are correct
-- ✅ Verify "Read Message History" permission
-
-**Gemini API errors:**
-- ✅ Verify API key is correct
-- ✅ Check API quota limits
-
-**Data not persisting:**
-- ✅ Check `ENABLE_PERSISTENCE=true`
-- ✅ Verify `data/` directory exists
-
-## Project Structure
-
+**Local (.env):**
+```env
+COMMAND_PREFIX="!g "
 ```
-.
-├── bot.py                  # Main bot application
-├── config.py               # Configuration management
-├── message_buffer.py       # Message collection
-├── task_note_manager.py    # Task/note management
-├── gemini_service.py       # Gemini AI integration
-├── persistence.py          # Data persistence
-├── requirements.txt        # Dependencies
-├── .env                    # Environment variables
-├── Procfile               # Railway deployment
-├── Dockerfile             # Docker configuration
-└── data/                  # Persistent storage
-    └── bot_data.json
+(WITH quotes, WITH space after !g)
+
+**Railway (Variables):**
+```
+COMMAND_PREFIX=!g
+```
+(NO quotes, WITH space after !g)
+
+**Verify in logs:**
+```
+Command prefix is: '!g '
+```
+Should show space, no extra quotes
+
+### Bot can't see messages
+
+**Problem:** Missing permissions or wrong channel IDs
+
+**Solution:**
+
+1. Check bot permissions in Discord:
+   - Read Messages
+   - Send Messages
+   - Embed Links
+   - Read Message History
+
+2. Verify channel IDs:
+   - Enable Developer Mode in Discord
+   - Right-click channel → Copy ID
+   - Check `CONTEXT_CHANNELS` and `COMMAND_CHANNELS` in `.env`
+
+3. Check logs:
+```
+CONTEXT CHANNELS (notes/plans - used for AI): 3
+   - 1234567890 (#your-channel-name)
 ```
 
-## Requirements
+### No messages in buffer
 
-- Python 3.11+
-- Discord Bot Token
-- Google Gemini API Key
+**Problem:** Bot not fetching old messages
+
+**Solution:**
+
+1. Check that channels are in `CONTEXT_CHANNELS` (not `COMMAND_CHANNELS`)
+2. Verify bot has "Read Message History" permission
+3. Check logs for:
+```
+Fetching old messages from context channels...
+Total messages fetched: 150
+```
+
+### Gemini API errors
+
+**Problem:** Invalid API key or quota exceeded
+
+**Solution:**
+
+1. Verify API key at [Google AI Studio](https://makersuite.google.com/)
+2. Check API quota and limits
+3. Ensure model name is correct: `gemini-2.5-flash`
+4. Check logs for specific error messages
+
+### Railway deployment fails
+
+**Problem:** Build or runtime errors
+
+**Solution:**
+
+1. Check Railway deployment logs
+2. Verify all environment variables are set correctly
+3. Ensure `COMMAND_PREFIX` has NO quotes in Railway
+4. Check that `requirements.txt` is up to date
+5. Verify `Procfile` exists and is correct:
+```
+worker: python bot.py
+```
 
 ---
 
-**Built with**: Python, discord.py, Google Gemini AI
+## License
+
+MIT License
+
+## Support
+
+For issues and questions:
+- Open an issue on GitHub
+- Check existing issues for solutions
+
+## Contributing
+
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 

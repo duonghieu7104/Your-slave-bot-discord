@@ -20,11 +20,26 @@ class Config:
     
     # Bot behavior settings
     MESSAGE_BUFFER_SIZE = int(os.getenv('MESSAGE_BUFFER_SIZE', '500'))
-    MONITORED_CHANNELS = [
-        int(ch_id.strip()) 
-        for ch_id in os.getenv('MONITORED_CHANNELS', '').split(',') 
+
+    # Context Channels: Messages are read and used as Gemini context (notes, plans, docs)
+    CONTEXT_CHANNELS = [
+        int(ch_id.strip())
+        for ch_id in os.getenv('CONTEXT_CHANNELS', '').split(',')
         if ch_id.strip()
     ]
+
+    # Command Channels: Bot responds to commands, but messages NOT used as context
+    COMMAND_CHANNELS = [
+        int(ch_id.strip())
+        for ch_id in os.getenv('COMMAND_CHANNELS', '').split(',')
+        if ch_id.strip()
+    ]
+
+    # All channels where bot is active (union of both)
+    ALL_CHANNELS = list(set(CONTEXT_CHANNELS + COMMAND_CHANNELS))
+
+    # Legacy support (deprecated)
+    MONITORED_CHANNELS = ALL_CHANNELS
     
     # Persistence settings
     ENABLE_PERSISTENCE = os.getenv('ENABLE_PERSISTENCE', 'true').lower() == 'true'

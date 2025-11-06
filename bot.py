@@ -49,10 +49,10 @@ class TaskNoteBot(commands.Bot):
             model_name=Config.GEMINI_MODEL
         )
         self.persistence = PersistenceManager(Config.PERSISTENCE_FILE) if Config.ENABLE_PERSISTENCE else None
-        
-        # Setup monitored channels
-        for channel_id in Config.MONITORED_CHANNELS:
-            self.message_buffer.add_monitored_channel(channel_id)
+
+        # Setup channel types
+        self.message_buffer.set_context_channels(Config.CONTEXT_CHANNELS)
+        self.message_buffer.set_command_channels(Config.COMMAND_CHANNELS)
         
         # Load persisted data
         self._load_data()
@@ -98,9 +98,61 @@ class TaskNoteBot(commands.Bot):
     
     async def on_ready(self):
         """Called when bot is ready"""
-        logger.info(f"Bot is ready! Logged in as {self.user}")
-        logger.info(f"Monitoring {len(self.message_buffer.monitored_channels)} channels")
-        logger.info(f"Command prefix: {Config.COMMAND_PREFIX}")
+        logger.info("=" * 80)
+        logger.info(f"🤖 Bot is ready! Logged in as {self.user}")
+        logger.info("=" * 80)
+        logger.info(f"📚 CONTEXT CHANNELS (notes/plans - used for AI): {len(self.message_buffer.context_channels)}")
+        for ch_id in self.message_buffer.context_channels:
+            channel = self.get_channel(ch_id)
+            channel_name = channel.name if channel else "unknown"
+            logger.info(f"   - {ch_id} (#{channel_name})")
+        logger.info(f"🤖 COMMAND CHANNELS (bot commands only): {len(self.message_buffer.command_channels)}")
+        for ch_id in self.message_buffer.command_channels:
+            channel = self.get_channel(ch_id)
+            channel_name = channel.name if channel else "unknown"
+            logger.info(f"   - {ch_id} (#{channel_name})")
+        logger.info(f"⚙️  Command prefix: {Config.COMMAND_PREFIX}")
+        logger.info(f"💾 Buffer size: {Config.MESSAGE_BUFFER_SIZE}")
+        logger.info("=" * 80)
+
+        # Fetch old messages from context channels
+        logger.info("🔄 Fetching old messages from context channels...")
+        total_fetched = 0
+        for ch_id in self.message_buffer.context_channels:
+            channel = self.get_channel(ch_id)
+            if channel:
+                try:
+                    logger.info(f"📥 Fetching from #{channel.name}...")
+                    # Fetch last 100 messages from each context channel
+                    async for message in channel.history(limit=100):
+                        # Skip bot messages
+                        if message.author.bot:
+                            continue
+                        self.message_buffer.add_message(message)
+                        total_fetched += 1
+                    logger.info(f"✅ Fetched {total_fetched} messages from #{channel.name}")
+                except Exception as e:
+                    logger.error(f"❌ Error fetching from #{channel.name}: {e}")
+
+        logger.info(f"✅ Total messages fetched: {total_fetched}")
+        logger.info("=" * 80)
+
+        # Print all buffered messages
+        all_messages = list(self.message_buffer.messages)
+        if all_messages:
+            logger.info("📋 ALL BUFFERED MESSAGES:")
+            logger.info("=" * 80)
+            for i, msg in enumerate(all_messages, 1):
+                channel_name = msg.get('channel_name', 'unknown')
+                timestamp = msg['timestamp'][:19]
+                author = msg['author']
+                content = msg['content'][:100]
+                logger.info(f"{i}. [#{channel_name}] [{timestamp}] {author}: {content}")
+            logger.info("=" * 80)
+            logger.info(f"Total buffered messages: {len(all_messages)}")
+        else:
+            logger.info("📋 No messages in buffer")
+        logger.info("=" * 80)
     
     async def on_message(self, message: discord.Message):
         """Handle incoming messages"""
@@ -183,7 +235,8 @@ async def help_command(ctx):
     embed.add_field(
         name="🤖 AI Commands",
         value=(
-            "`!g ask <question>` - Ask Gemini anything\n"
+            "`!g ask <question>` - Ask with context from notes/plans\n"
+            "`!g chat <prompt>` - Chat with Gemini (no context)\n"
             "`!g summarize [limit]` - Summarize recent messages\n"
             "`!g analyze tasks` - Analyze your tasks\n"
             "`!g analyze notes` - Analyze your notes"
@@ -195,6 +248,7 @@ async def help_command(ctx):
         name="⚙️ Utility Commands",
         value=(
             "`!g stats` - Show bot statistics\n"
+            "`!g buffer [limit]` - Show buffered messages\n"
             "`!g save` - Manually save data\n"
             "`!g monitor <channel_id>` - Add channel to monitoring"
         ),
@@ -210,21 +264,34 @@ async def stats_command(ctx):
     logger.info(f"Stats command called by {ctx.author}")
     buffer_stats = bot.message_buffer.get_stats()
     task_note_stats = bot.task_manager.get_stats()
-    
+
     embed = discord.Embed(
         title="📊 Bot Statistics",
         color=discord.Color.green()
     )
-    
+
+    # Channel configuration
+    embed.add_field(
+        name="📚 Context Channels (Notes/Plans)",
+        value=f"{len(bot.message_buffer.context_channels)} channels - Messages used for AI context",
+        inline=False
+    )
+
+    embed.add_field(
+        name="🤖 Command Channels",
+        value=f"{len(bot.message_buffer.command_channels)} channels - Bot commands only",
+        inline=False
+    )
+
     embed.add_field(
         name="💬 Message Buffer",
         value=(
-            f"Messages stored: {buffer_stats['total_messages']}/{buffer_stats['max_size']}\n"
-            f"Monitored channels: {buffer_stats['monitored_channels']}"
+            f"Context messages stored: {buffer_stats['total_messages']}/{buffer_stats['max_size']}\n"
+            f"(Only from context channels)"
         ),
         inline=False
     )
-    
+
     embed.add_field(
         name="✅ Tasks",
         value=(
@@ -235,13 +302,13 @@ async def stats_command(ctx):
         ),
         inline=True
     )
-    
+
     embed.add_field(
         name="📝 Notes",
         value=f"Total: {task_note_stats['notes']['total']}",
         inline=True
     )
-    
+
     await ctx.send(embed=embed)
 
 
@@ -251,9 +318,54 @@ async def save_command(ctx):
     if not bot.persistence:
         await ctx.send("❌ Persistence is not enabled")
         return
-    
+
     bot._save_data()
     await ctx.send("✅ Data saved successfully")
+
+
+@bot.command(name='buffer')
+async def buffer_command(ctx, limit: int = 20):
+    """Show buffered messages from context channels"""
+    logger.info(f"Buffer command called by {ctx.author}")
+
+    all_messages = list(bot.message_buffer.messages)
+
+    if not all_messages:
+        await ctx.send("📋 No messages in buffer")
+        return
+
+    # Get last N messages
+    messages_to_show = all_messages[-limit:] if len(all_messages) > limit else all_messages
+
+    embed = discord.Embed(
+        title=f"📋 Buffered Messages (Last {len(messages_to_show)} of {len(all_messages)})",
+        color=discord.Color.blue()
+    )
+
+    # Group by channel
+    channels = {}
+    for msg in messages_to_show:
+        channel_name = msg.get('channel_name', 'unknown')
+        if channel_name not in channels:
+            channels[channel_name] = []
+        channels[channel_name].append(msg)
+
+    # Add fields for each channel
+    for channel_name, msgs in channels.items():
+        msg_list = []
+        for msg in msgs[:5]:  # Max 5 per channel in embed
+            timestamp = msg['timestamp'][:16]
+            author = msg['author'].split('#')[0]  # Remove discriminator
+            content = msg['content'][:50]
+            msg_list.append(f"`{timestamp}` **{author}**: {content}...")
+
+        embed.add_field(
+            name=f"#{channel_name} ({len(msgs)} messages)",
+            value="\n".join(msg_list) if msg_list else "No messages",
+            inline=False
+        )
+
+    await ctx.send(embed=embed)
 
 
 @bot.command(name='monitor')
@@ -434,14 +546,47 @@ async def note_delete(ctx, note_id: int):
 
 @bot.command(name='ask')
 async def ask_command(ctx, *, question: str):
-    """Ask Gemini AI a question"""
-    async with ctx.typing():
-        # Get recent messages for context
-        recent_messages = bot.message_buffer.get_recent_messages(limit=50)
-        context = bot.message_buffer.format_messages_for_context(recent_messages)
+    """Ask Gemini AI a question with context from notes/plans"""
+    logger.info(f"Ask command called by {ctx.author} with question: {question}")
 
-        # Generate response
-        response = bot.gemini.generate_response(question, context)
+    async with ctx.typing():
+        # Get recent messages for context (from context channels only)
+        recent_messages = bot.message_buffer.get_recent_messages(limit=100)
+        logger.info(f"Retrieved {len(recent_messages)} messages from buffer")
+
+        # Print out the messages being sent to Gemini
+        logger.info("=" * 80)
+        logger.info("MESSAGES BEING SENT TO GEMINI API:")
+        logger.info("=" * 80)
+        for i, msg in enumerate(recent_messages, 1):
+            channel_name = msg.get('channel_name', 'unknown')
+            logger.info(f"Message {i} [#{channel_name}] [{msg['timestamp'][:19]}] {msg['author']}: {msg['content'][:100]}")
+        logger.info("=" * 80)
+
+        # Format context with channel names
+        context = bot.message_buffer.format_messages_for_context(recent_messages)
+        logger.info(f"Context length: {len(context)} characters")
+        logger.info(f"Full context being sent to Gemini:")
+        logger.info("=" * 80)
+        logger.info(context)
+        logger.info("=" * 80)
+
+        # Create the prompt with clear structure
+        formatted_prompt = f"""Here is my plan and notes:
+
+{context}
+
+The question is: {question}"""
+
+        logger.info(f"Sending to Gemini API")
+        logger.info("FULL PROMPT:")
+        logger.info("=" * 80)
+        logger.info(formatted_prompt)
+        logger.info("=" * 80)
+
+        # Send the full prompt directly (don't use context parameter)
+        response = bot.gemini.model.generate_content(formatted_prompt).text
+        logger.info(f"Received response from Gemini: {len(response)} characters")
 
         # Split response if too long
         if len(response) > 2000:
@@ -450,6 +595,35 @@ async def ask_command(ctx, *, question: str):
                 await ctx.send(chunk)
         else:
             await ctx.send(response)
+
+
+@bot.command(name='chat')
+async def chat_command(ctx, *, prompt: str):
+    """Chat with Gemini AI (no context, just your prompt)"""
+    logger.info(f"Chat command called by {ctx.author} with prompt: {prompt}")
+
+    async with ctx.typing():
+        logger.info("=" * 80)
+        logger.info("SENDING PROMPT TO GEMINI API (NO CONTEXT):")
+        logger.info("=" * 80)
+        logger.info(prompt)
+        logger.info("=" * 80)
+
+        try:
+            # Send only the user's prompt, no context
+            response = bot.gemini.model.generate_content(prompt).text
+            logger.info(f"Received response from Gemini: {len(response)} characters")
+
+            # Split response if too long
+            if len(response) > 2000:
+                chunks = [response[i:i+2000] for i in range(0, len(response), 2000)]
+                for chunk in chunks:
+                    await ctx.send(chunk)
+            else:
+                await ctx.send(response)
+        except Exception as e:
+            logger.error(f"Error in chat command: {e}")
+            await ctx.send(f"❌ Error: {str(e)}")
 
 
 @bot.command(name='summarize')
