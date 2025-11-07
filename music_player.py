@@ -32,6 +32,19 @@ class MusicPlayer:
             'no_warnings': True,
             'default_search': 'auto',
             'source_address': '0.0.0.0',
+            'nocheckcertificate': True,
+            'ignoreerrors': False,
+            'logtostderr': False,
+            'no_color': True,
+            'extract_flat': False,
+            'age_limit': None,
+            'extractor_args': {
+                'youtube': {
+                    'skip': ['hls', 'dash', 'translated_subs'],
+                    'player_skip': ['configs', 'webpage'],
+                    'player_client': ['android', 'web'],
+                }
+            },
         }
         
         # FFmpeg options
@@ -81,15 +94,36 @@ class MusicPlayer:
     def extract_info(self, url: str) -> Optional[dict]:
         """Extract video information from YouTube URL"""
         try:
-            with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
+            # Try with android client first (more reliable)
+            ydl_opts_android = self.ydl_opts.copy()
+            ydl_opts_android['extractor_args'] = {
+                'youtube': {
+                    'player_client': ['android'],
+                    'skip': ['hls', 'dash'],
+                }
+            }
+
+            logger.info(f"Attempting to extract info with Android client...")
+            with yt_dlp.YoutubeDL(ydl_opts_android) as ydl:
                 info = ydl.extract_info(url, download=False)
-                
+
                 # Handle playlists
                 if 'entries' in info:
                     info = info['entries'][0]
-                
+
+                # Get the best audio format
+                if 'formats' in info:
+                    audio_formats = [f for f in info['formats'] if f.get('acodec') != 'none']
+                    if audio_formats:
+                        best_audio = max(audio_formats, key=lambda f: f.get('abr', 0) or 0)
+                        audio_url = best_audio['url']
+                    else:
+                        audio_url = info['url']
+                else:
+                    audio_url = info.get('url', '')
+
                 return {
-                    'url': info['url'],
+                    'url': audio_url,
                     'title': info.get('title', 'Unknown'),
                     'duration': info.get('duration', 0),
                     'thumbnail': info.get('thumbnail', ''),
@@ -97,12 +131,15 @@ class MusicPlayer:
                 }
         except Exception as e:
             logger.error(f"Error extracting video info: {e}")
+            # Try to provide more helpful error message
+            if "Sign in to confirm" in str(e) or "bot" in str(e).lower():
+                logger.error("YouTube is blocking the request. This video may be age-restricted or require authentication.")
             return None
     
     async def play(self, url: str, channel_id: int) -> tuple[bool, str]:
         """
         Play audio from YouTube URL
-        
+
         Returns:
             tuple[bool, str]: (success, message)
         """
@@ -110,39 +147,45 @@ class MusicPlayer:
             # Join voice channel
             if not await self.join_voice_channel(channel_id):
                 return False, "Failed to join voice channel"
-            
+
             # Stop current playback if any
             if self.voice_client.is_playing():
                 self.voice_client.stop()
-            
+
             # Extract video info
             logger.info(f"Extracting info from: {url}")
             info = self.extract_info(url)
-            
+
             if not info:
-                return False, "Failed to extract video information"
-            
+                error_msg = "Failed to extract video information. The video may be:\n"
+                error_msg += "- Age-restricted\n"
+                error_msg += "- Private or deleted\n"
+                error_msg += "- Blocked in your region\n"
+                error_msg += "- A live stream that hasn't started\n"
+                error_msg += "\nTry a different video."
+                return False, error_msg
+
             self.current_song = info
-            
+
             # Create audio source
             audio_source = discord.FFmpegPCMAudio(
                 info['url'],
                 **self.ffmpeg_options
             )
-            
+
             # Play audio
             def after_playing(error):
                 if error:
                     logger.error(f"Playback error: {error}")
                 self.is_playing = False
                 self.current_song = None
-            
+
             self.voice_client.play(audio_source, after=after_playing)
             self.is_playing = True
-            
+
             logger.info(f"Now playing: {info['title']}")
             return True, f"Now playing: **{info['title']}**"
-            
+
         except Exception as e:
             logger.error(f"Error playing audio: {e}")
             return False, f"Error: {str(e)}"
