@@ -12,6 +12,7 @@ from message_buffer import MessageBuffer
 from task_note_manager import TaskNoteManager, TaskStatus
 from gemini_service import GeminiService
 from persistence import PersistenceManager
+from music_player import MusicPlayer
 
 # Setup logging
 logging.basicConfig(
@@ -49,14 +50,15 @@ class TaskNoteBot(commands.Bot):
             model_name=Config.GEMINI_MODEL
         )
         self.persistence = PersistenceManager(Config.PERSISTENCE_FILE) if Config.ENABLE_PERSISTENCE else None
+        self.music_player = MusicPlayer(self)
 
         # Setup channel types
         self.message_buffer.set_context_channels(Config.CONTEXT_CHANNELS)
         self.message_buffer.set_command_channels(Config.COMMAND_CHANNELS)
-        
+
         # Load persisted data
         self._load_data()
-        
+
         # Auto-save task
         self.auto_save_task = None
     
@@ -245,6 +247,18 @@ async def help_command(ctx):
     )
     
     embed.add_field(
+        name="🎵 Music Commands",
+        value=(
+            "`!g play <youtube_url>` - Play YouTube audio\n"
+            "`!g stop` - Stop playback\n"
+            "`!g pause` - Pause playback\n"
+            "`!g resume` - Resume playback\n"
+            "`!g nowplaying` - Show current song"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
         name="⚙️ Utility Commands",
         value=(
             "`!g stats` - Show bot statistics\n"
@@ -254,7 +268,7 @@ async def help_command(ctx):
         ),
         inline=False
     )
-    
+
     await ctx.send(embed=embed)
 
 
@@ -656,6 +670,125 @@ async def analyze_command(ctx, target: str):
 
         else:
             await ctx.send("❌ Please specify 'tasks' or 'notes'")
+
+
+# ===== MUSIC COMMANDS =====
+
+@bot.command(name='play')
+async def play_command(ctx, *, url: str):
+    """Play YouTube audio in voice channel"""
+    logger.info(f"Play command called by {ctx.author} with URL: {url}")
+
+    # Check if voice channel is configured
+    if not Config.VOICE_CHANNEL_ID:
+        await ctx.send("❌ Voice channel not configured. Please set VOICE_CHANNEL_ID in .env")
+        return
+
+    async with ctx.typing():
+        success, message = await bot.music_player.play(url, Config.VOICE_CHANNEL_ID)
+
+        if success:
+            # Create embed for now playing
+            embed = discord.Embed(
+                title="🎵 Now Playing",
+                description=bot.music_player.current_song['title'],
+                color=discord.Color.green()
+            )
+
+            if bot.music_player.current_song.get('thumbnail'):
+                embed.set_thumbnail(url=bot.music_player.current_song['thumbnail'])
+
+            duration = bot.music_player.current_song.get('duration', 0)
+            if duration:
+                minutes = duration // 60
+                seconds = duration % 60
+                embed.add_field(name="Duration", value=f"{minutes}:{seconds:02d}")
+
+            embed.add_field(
+                name="URL",
+                value=f"[Link]({bot.music_player.current_song['webpage_url']})",
+                inline=False
+            )
+
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send(f"❌ {message}")
+
+
+@bot.command(name='stop')
+async def stop_command(ctx):
+    """Stop music playback"""
+    logger.info(f"Stop command called by {ctx.author}")
+
+    if await bot.music_player.stop():
+        await ctx.send("⏹️ Playback stopped")
+    else:
+        await ctx.send("❌ Nothing is playing")
+
+
+@bot.command(name='pause')
+async def pause_command(ctx):
+    """Pause music playback"""
+    logger.info(f"Pause command called by {ctx.author}")
+
+    if await bot.music_player.pause():
+        await ctx.send("⏸️ Playback paused")
+    else:
+        await ctx.send("❌ Nothing is playing")
+
+
+@bot.command(name='resume')
+async def resume_command(ctx):
+    """Resume music playback"""
+    logger.info(f"Resume command called by {ctx.author}")
+
+    if await bot.music_player.resume():
+        await ctx.send("▶️ Playback resumed")
+    else:
+        await ctx.send("❌ Nothing is paused")
+
+
+@bot.command(name='nowplaying', aliases=['np'])
+async def nowplaying_command(ctx):
+    """Show currently playing song"""
+    logger.info(f"Now playing command called by {ctx.author}")
+
+    song = bot.music_player.get_current_song()
+
+    if song:
+        embed = discord.Embed(
+            title="🎵 Now Playing",
+            description=song['title'],
+            color=discord.Color.green()
+        )
+
+        if song.get('thumbnail'):
+            embed.set_thumbnail(url=song['thumbnail'])
+
+        duration = song.get('duration', 0)
+        if duration:
+            minutes = duration // 60
+            seconds = duration % 60
+            embed.add_field(name="Duration", value=f"{minutes}:{seconds:02d}")
+
+        embed.add_field(
+            name="URL",
+            value=f"[Link]({song['webpage_url']})",
+            inline=False
+        )
+
+        await ctx.send(embed=embed)
+    else:
+        await ctx.send("❌ Nothing is playing")
+
+
+@bot.command(name='leave')
+async def leave_command(ctx):
+    """Leave voice channel"""
+    logger.info(f"Leave command called by {ctx.author}")
+
+    await bot.music_player.leave_voice_channel()
+    await ctx.send("👋 Left voice channel")
 
 
 # ===== RUN BOT =====
