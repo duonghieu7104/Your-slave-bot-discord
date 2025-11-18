@@ -41,9 +41,6 @@ class Config:
     # Legacy support (deprecated)
     MONITORED_CHANNELS = ALL_CHANNELS
 
-    # Voice Channel for music playback
-    VOICE_CHANNEL_ID = int(os.getenv('VOICE_CHANNEL_ID', '0')) if os.getenv('VOICE_CHANNEL_ID') else None
-
     # Persistence settings
     ENABLE_PERSISTENCE = os.getenv('ENABLE_PERSISTENCE', 'true').lower() == 'true'
     PERSISTENCE_FILE = os.getenv('PERSISTENCE_FILE', 'data/bot_data.json')
@@ -56,4 +53,3 @@ class Config:
         if not cls.GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY is required")
         return True
-

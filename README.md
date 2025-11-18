@@ -36,7 +36,6 @@ A powerful Discord bot that helps you manage tasks, notes, and leverages Google'
   - Chat directly with Gemini AI without context
   - Summarize conversations
   - Analyze tasks and notes
-- **Music Player**: Play YouTube audio in voice channels
 - **Smart Channel System**:
   - Context Channels: Messages are stored and used as AI context (notes, plans, documentation)
   - Command Channels: Bot responds to commands only (messages not stored)
@@ -51,7 +50,7 @@ A powerful Discord bot that helps you manage tasks, notes, and leverages Google'
 
 - <img width="1406" height="380" alt="image" src="https://github.com/user-attachments/assets/3e3335cc-c0b6-4154-a222-20642389a43a" />
 
-- <img width="621" height="757" alt="image" src="https://github.com/user-attachments/assets/3d40d6ed-5b37-446a-803e-f75976a998a8" />
+- <img width="621" height="757" alt="image" src="https://github.com/user-attachments/assets/3d40d6ed-c0b6-4154-a222-20642389a43a" />
 
 
 **Video Demo:**
@@ -62,7 +61,6 @@ A powerful Discord bot that helps you manage tasks, notes, and leverages Google'
 - Python 3.8 or higher
 - Discord Bot Token - [Create one here](https://discord.com/developers/applications)
 - Google Gemini API Key - [Get one here](https://makersuite.google.com/app/apikey)
-- FFmpeg (required for music playback)
 - Docker (optional, for containerized deployment)
 - Railway account (optional, for cloud deployment)
 
@@ -101,25 +99,7 @@ git clone <your-repo-url>
 cd Your-slave
 ```
 
-**Step 2: Install FFmpeg**
-
-FFmpeg is required for music playback.
-
-**Ubuntu/Debian:**
-```bash
-sudo apt update
-sudo apt install ffmpeg
-```
-
-**macOS:**
-```bash
-brew install ffmpeg
-```
-
-**Windows:**
-Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH
-
-**Step 3: Install Python Dependencies**
+**Step 2: Install Python Dependencies**
 
 ```bash
 pip install -r requirements.txt
@@ -133,13 +113,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-**Step 2: Get Voice Channel ID (for music feature)**
-
-1. Enable Developer Mode in Discord (User Settings → Advanced → Developer Mode)
-2. Right-click on a voice channel → Copy ID
-3. Save this ID for the next step
-
-**Step 3: Edit `.env` File**
+**Step 2: Edit `.env` File**
 
 Open `.env` and configure the following:
 
@@ -163,9 +137,6 @@ CONTEXT_CHANNELS=channel_id_1,channel_id_2,channel_id_3
 # These are your bot interaction channels
 COMMAND_CHANNELS=channel_id_4,channel_id_5,channel_id_6
 
-# Voice Channel: Channel ID where bot will join to play music
-VOICE_CHANNEL_ID=your_voice_channel_id_here
-
 ENABLE_PERSISTENCE=true
 PERSISTENCE_FILE=data/bot_data.json
 ```
@@ -173,7 +144,6 @@ PERSISTENCE_FILE=data/bot_data.json
 **Important Notes:**
 - For local development, use `COMMAND_PREFIX="!g "` (WITH quotes and space)
 - Get channel IDs by enabling Developer Mode in Discord (User Settings → Advanced → Developer Mode), then right-click channel → Copy ID
-- Voice channel ID is required for music playback feature
 
 ### Running the Bot
 
@@ -382,17 +352,6 @@ Command prefix: !g
 !g analyze notes                       # Analyze your notes
 ```
 
-### Music Commands
-
-```
-!g play <youtube_url>                  # Play YouTube audio in voice channel
-!g stop                                # Stop playback
-!g pause                               # Pause playback
-!g resume                              # Resume playback
-!g nowplaying                          # Show current song
-!g leave                               # Leave voice channel
-```
-
 ### Utility Commands
 
 ```
@@ -421,7 +380,7 @@ COMMAND_PREFIX="!g "
 (WITH quotes, WITH space after !g)
 
 **Railway (Variables):**
-```
+```env
 COMMAND_PREFIX=!g
 ```
 (NO quotes, WITH space after !g)
@@ -514,4 +473,3 @@ Contributions are welcome! Please:
 2. Create a feature branch
 3. Make your changes
 4. Submit a pull request
-
